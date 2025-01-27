@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>File Sharing Notifications ffs</title>
+</head>
+<body>
+  <h1>Live File Sharing App ffs</h1>
+  <ul id="notifications"></ul>
+  <script src="/socket.io/socket.io.js"></script>
+  <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>File Sharing Notifications</title>
+</head>
+<body>
+  <h1>Live File Sharing App</h1>
+  <ul id="notifications"></ul>
+
+  <!-- Add a button to start the call -->
+  <button onclick="startCall()">Start Call with Peer</button>
+
+  <div>
+    <input id="messageInput" type="text" placeholder="Type a message..." />
+    <button onclick="sendTypedMessage()">Send Message</button>
+  </div>
+  
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // Connect to the Socket.io server
+    const socket = io();
+
+    // Peer connection object for WebRTC
+    let peerConnection;
+
+    // Data channel object
+    let dataChannel;
+
+    // ICE server configuration
+    const configuration = {
+        iceServers: [
+            {
+                urls: 'stun:stun.l.google.com:19302', // Public STUN server
+            },
+        ],
+    };
+
+    // When connected, log the socket ID
+    socket.on('connect', () => {
+        console.log(`Connected with ID: ${socket.id}`);
+    });
+
+    // Function to create a WebRTC offer with a data channel
+    async function createOffer(targetId) {
+        peerConnection = new RTCPeerConnection(configuration);
+        console.log("peerConnection created:", peerConnection);
+
+        // Create a data channel
+        dataChannel = peerConnection.createDataChannel("fileChannel");
+        console.log("Data channel created:", dataChannel);
+
+        // Handle data channel events
+        handleDataChannelEvents(dataChannel);
+
+        // Handle ICE candidates
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                socket.emit('signal', { targetId, data: { type: 'candidate', candidate: event.candidate } });
+            }
+        };
+
+        // Create and send the offer
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+
+        socket.emit('signal', { targetId, data: { type: 'offer', offer } });
+    }
+
+    // Function to handle incoming signaling messages
+    socket.on('signal', async ({ senderId, data }) => {
+        if (!peerConnection) {
+            peerConnection = new RTCPeerConnection(configuration);
+            console.log("peerConnection created:", peerConnection);
+
+            // Listen for incoming data channel
+            peerConnection.ondatachannel = (event) => {
+                const incomingChannel = event.channel;
+                console.log("Data channel received:", incomingChannel);
+
+                // Handle data channel events
+                handleDataChannelEvents(incomingChannel);
+            };
+
+            // Handle ICE candidates
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit('signal', { targetId: senderId, data: { type: 'candidate', candidate: event.candidate } });
+                }
+            };
+        }
+
+        // Handle incoming offer
+        if (data.type === 'offer') {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+
+            socket.emit('signal', { targetId: senderId, data: { type: 'answer', answer } });
+        }
+
+        // Handle incoming answer
+        if (data.type === 'answer') {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+        }
+
+        // Handle incoming ICE candidate
+        if (data.type === 'candidate') {
+            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+        }
+    });
+
+    // Handle data channel events (for both sending and receiving)
+    function handleDataChannelEvents(channel) {
+        channel.onopen = () => {
+            console.log("Data channel opened:", channel);
+        };
+
+        channel.onclose = () => {
+            console.log("Data channel closed:", channel);
+        };
+
+        channel.onmessage = (event) => {
+            console.log("Message received via data channel:", event.data);
+        };
+
+        dataChannel = channel
+    }
+
+    // Function to send a message via the data channel
+    function sendMessage(message) {
+      if (dataChannel && dataChannel.readyState === "open") {
+        dataChannel.send(message);
+        console.log("Message sent via data channel:", message);
+    } else {
+        console.error("Data channel is not open!");
+    }
+    }
+
+    // Function to start the call
+    function startCall() {
+        const targetId = prompt("Enter Peer ID: "); // Ask for the target peer ID dynamically
+        if (targetId && targetId.trim() !== "") {
+            createOffer(targetId); // Call createOffer with the targetId
+        } else {
+            console.error("No valid Peer ID provided!");
+        }
+    }
+
+    function sendTypedMessage() {
+    const messageInput = document.getElementById("messageInput");
+    const message = messageInput.value.trim();
+
+    if (message) {
+        sendMessage(message); // Use the existing sendMessage function
+        console.log("Sent message:", message);
+        messageInput.value = ""; // Clear the input field after sending
+    } else {
+        console.error("Cannot send an empty message!");
+    }
+}
+
+    // Example: Send a test message
+    function sendTestMessage() {
+        const message = prompt("Enter a message to send:");
+        if (message) {
+            sendMessage(message);
+        }
+    }
+</script> 
+
+
+
+</body>
+</html>
+
+
+</body>
+</html>
