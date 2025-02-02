@@ -18,7 +18,8 @@
 </head>
 <body>
   <h1>Live File Sharing App</h1>
-  <ul id="notifications"></ul>
+  <!-- <ul id="notifications"></ul> -->
+   <h5 id="notifications"></h5>
 
   <!-- Add a button to start the call -->
   <button onclick="startCall()">Start Call with Peer</button>
@@ -26,6 +27,7 @@
   <div>
     <input id="messageInput" type="text" placeholder="Type a message..." />
     <button onclick="sendTypedMessage()">Send Message</button>
+    <input type="file" id="fileInput"> Send File
   </div>
   
   <script src="/socket.io/socket.io.js"></script>
@@ -123,8 +125,13 @@
         }
     });
 
+    let receivedChunks = []; // Array to store incoming file chunks
+
+
     // Handle data channel events (for both sending and receiving)
     function handleDataChannelEvents(channel) {
+        
+
         channel.onopen = () => {
             console.log("Data channel opened:", channel);
         };
@@ -134,11 +141,44 @@
         };
 
         channel.onmessage = (event) => {
-            console.log("Message received via data channel:", event.data);
-        };
-
+    if (event.data === "DONE") {
+        console.log("File transfer complete!");
+        document.getElementById("notifications").innerHTML = "File transfer complete!";
+        assembleFile();  // Call the file reassembly function after all chunks are received
+    } else {
+        console.log("Chunk received:", event.data);
+        receiveChunk(event.data); // Call the function to store each received chunk
+    }
+};
         dataChannel = channel
     }
+
+// Function to store the received chunks
+function receiveChunk(chunk) {
+    receivedChunks.push(chunk); // Add the chunk to the receivedChunks array
+    console.log(`Chunk ${receivedChunks.length} received.`);
+}
+
+// Function to reassemble the chunks into a single file
+function assembleFile() {
+    if (receivedChunks.length === 0) return null;
+
+    // Combine all ArrayBuffers into a single Blob
+    const fileBlob = new Blob(receivedChunks);
+
+    // Create a download link for the file
+    const url = URL.createObjectURL(fileBlob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "received_file"; // You can modify the filename
+    a.innerHTML = `${url}`
+    document.body.appendChild(a);
+    // a.click();
+    // document.body.removeChild(a);
+
+    console.log("File successfully reassembled and ready for download!");
+}
+
 
     // Function to send a message via the data channel
     function sendMessage(message) {
@@ -172,6 +212,108 @@
         console.error("Cannot send an empty message!");
     }
 }
+
+// Function to chunk the file
+function chunkFile(file, chunkSize = 64 * 1024) { // Default chunk size: 64 KB
+    const chunks = [];
+    let start = 0;
+
+    while (start < file.size) {
+        const end = Math.min(start + chunkSize, file.size);
+        const chunk = file.slice(start, end); // Slice the file into chunks
+        chunks.push(chunk);
+        start = end;
+    }
+
+    return chunks; // Return an array of file chunks
+}
+
+
+document.getElementById("fileInput").addEventListener("change", function (event) {
+    const file = event.target.files[0];
+
+    if (!file) return; // Exit early if no file is selected
+
+    console.log(`File sent with name ${file.name}, size = ${file.size} bytes`);
+
+    const chunks = chunkFile(file); // Define chunks outside if block
+    console.log(`File divided into ${chunks.length} chunks`);
+
+    // Send file metadata before transfer
+    const metaData = {
+        filename: file.name,
+        filesize: file.size,
+        totalChunks: chunks.length
+    };
+    
+    console.log(metaData);
+
+    // Send metadata via data channel
+    if (dataChannel && dataChannel.readyState === "open") {
+        dataChannel.send(JSON.stringify({ type: "file-metadata", metaData }));
+        console.log(`Sent file metadata: ${JSON.stringify(metaData)}`);
+    }
+
+    sendChunks(chunks); // Ensure sendChunks(chunks) is called only when chunks is defined
+});
+
+
+//send chunks 
+function sendChunks(chunks) {
+    let chunkIndex = 0;
+    const totalChunks = chunks.length;
+    console.log("sendChunks function starting")
+    
+    // Function to update the progress on the UI
+    function updateProgress() {
+        const progress = Math.floor((chunkIndex / totalChunks) * 100);
+        document.getElementById("notifications").innerHTML = `Sending: ${progress}% (${chunkIndex + 1}/${totalChunks} chunks)`;
+    }
+
+    function sendNextChunk(){
+        if(chunkIndex<chunks.length){
+            if(dataChannel.readyState == "open" && dataChannel.bufferedAmount === 0){
+                const reader = new FileReader()
+                reader.onload = (event)=>{
+                    const arrayBuffer = event.target.result; // Convert Blob to ArrayBuffer
+                    dataChannel.send(arrayBuffer)
+                    console.log(`Sent chunk ${chunkIndex+1}/${chunks.length}`)
+                    chunkIndex++;
+                    updateProgress(); // Update progress after sending a chunk
+    
+                    // Send the next chunk after a small delay (prevents congestion)
+                    setTimeout(sendNextChunk, 10);
+
+                }
+                //Read file chunks as ArrayBuffer using FileReader.readAsArrayBuffer().
+            reader.readAsArrayBuffer(chunks[chunkIndex]);
+
+            }
+            else{
+                //wait for the buffer to clear out
+                setTimeout(sendNextChunk, 50)
+            }
+            
+
+        }
+    else{
+        //all chunks sent, notify the reciever
+        dataChannel.send("DONE")
+        console.log("All chunks sent. Transfer complete.");
+    }
+    }
+    sendNextChunk();
+}
+
+
+
+
+
+
+
+
+
+
 
     // Example: Send a test message
     function sendTestMessage() {
