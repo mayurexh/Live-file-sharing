@@ -15,31 +15,66 @@ const server = http.createServer(app);
 
 
 // Initialize Socket.io
-const io = new Server(server);
+const io = new Server(server,{
+  cors: {
+      origin: "*",
+      methods: ["GET", "POST"]
+  }
+});
 
 
 // serve satatic files
 app.use(express.static('public'));
 
 server.listen(PORT, () => {'Server is running on http://localhost:${PORT}'});
+// Store active sessions
+const sessions = new Map();
 
-//Fires when a client connects.
-io.on('connection', (socket)=>{
-  //A unique socket object is created for each client, representing its connection.
-    console.log(`A user has connected with id: ${socket.id}`)
 
-    // Forward signaling data (offer/answer/ICE candidates) to the target peer
-    socket.on('signal', ({targetId, data})=>{
-      console.log(`Signaling data received for: ${targetId}`);
-      io.to(targetId).emit('signal', {senderId: socket.id, data})
+io.on('connection', (socket) => {
+  console.log(`Client connected: ${socket.id}`);
 
-    })
-  
-    //Handle disconnection of user
-    socket.on('disconnect', ()=>{
-      console.log("A user has disconnected")  
-    })
-  })
+  socket.on('joinSession', ({ sessionID }) => {
+      console.log(`Socket ${socket.id} joining session ${sessionID}`);
+
+      if (!sessions.has(sessionID)) {
+          sessions.set(sessionID, new Set([socket.id]));
+      } else {
+          const session = sessions.get(sessionID);
+          if (session.size >= 2) {
+              socket.emit('error', { message: 'Session is full' });
+              return;
+          }
+          session.add(socket.id);
+
+          // If we now have two peers, start the call
+          if (session.size === 2) {
+              const [firstPeer, secondPeer] = session;
+              io.to(firstPeer).emit('startCall', { targetId: secondPeer });
+          }
+      }
+
+      socket.join(sessionID);
+      socket.sessionID = sessionID;
+  });
+
+  socket.on('signal', ({ targetId, data }) => {
+      io.to(targetId).emit('signal', {
+          senderId: socket.id,
+          data
+      });
+  });
+
+  socket.on('disconnect', () => {
+      if (socket.sessionID && sessions.has(socket.sessionID)) {
+          const session = sessions.get(socket.sessionID);
+          session.delete(socket.id);
+          if (session.size === 0) {
+              sessions.delete(socket.sessionID);
+          }
+      }
+  });
+});
 
 // Define a basic route
 app.get('/', (req, res) => {

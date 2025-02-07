@@ -1,334 +1,38 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>File Sharing Notifications ffs</title>
+    <title>WebRTC Chat</title>
+    <style>
+        #chatBox {
+            display: none;
+            margin-top: 20px;
+        }
+        #messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        #messageInput {
+            width: 80%;
+            padding: 5px;
+        }
+    </style>
 </head>
 <body>
-  <h1>Live File Sharing App ffs</h1>
-  <ul id="notifications"></ul>
-  <script src="/socket.io/socket.io.js"></script>
-  <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>File Sharing Notifications</title>
-</head>
-<body>
-  <h1>Live File Sharing App</h1>
-  <!-- <ul id="notifications"></ul> -->
-   <h5 id="notifications"></h5>
-
-  <!-- Add a button to start the call -->
-  <button onclick="startCall()">Start Call with Peer</button>
-
-  <div>
-    <input id="messageInput" type="text" placeholder="Type a message..." />
-    <button onclick="sendTypedMessage()">Send Message</button>
-    <input type="file" id="fileInput"> Send File
-  </div>
-  
-  <script src="/socket.io/socket.io.js"></script>
-  <script>
-    // Connect to the Socket.io server
-    const socket = io();
-
-    // Peer connection object for WebRTC
-    let peerConnection;
-
-    // Data channel object
-    let dataChannel;
-
-    // ICE server configuration
-    const configuration = {
-        iceServers: [
-            {
-                urls: 'stun:stun.l.google.com:19302', // Public STUN server
-            },
-        ],
-    };
-
-    // When connected, log the socket ID
-    socket.on('connect', () => {
-        console.log(`Connected with ID: ${socket.id}`);
-    });
-
-    // Function to create a WebRTC offer with a data channel
-    async function createOffer(targetId) {
-        peerConnection = new RTCPeerConnection(configuration);
-        console.log("peerConnection created:", peerConnection);
-
-        // Create a data channel
-        dataChannel = peerConnection.createDataChannel("fileChannel");
-        console.log("Data channel created:", dataChannel);
-
-        // Handle data channel events
-        handleDataChannelEvents(dataChannel);
-
-        // Handle ICE candidates
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                socket.emit('signal', { targetId, data: { type: 'candidate', candidate: event.candidate } });
-            }
-        };
-
-        // Create and send the offer
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-
-        socket.emit('signal', { targetId, data: { type: 'offer', offer } });
-    }
-
-    // Function to handle incoming signaling messages
-    socket.on('signal', async ({ senderId, data }) => {
-        if (!peerConnection) {
-            peerConnection = new RTCPeerConnection(configuration);
-            console.log("peerConnection created:", peerConnection);
-
-            // Listen for incoming data channel
-            peerConnection.ondatachannel = (event) => {
-                const incomingChannel = event.channel;
-                console.log("Data channel received:", incomingChannel);
-
-                // Handle data channel events
-                handleDataChannelEvents(incomingChannel);
-            };
-
-            // Handle ICE candidates
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                    socket.emit('signal', { targetId: senderId, data: { type: 'candidate', candidate: event.candidate } });
-                }
-            };
-        }
-
-        // Handle incoming offer
-        if (data.type === 'offer') {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-
-            const answer = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answer);
-
-            socket.emit('signal', { targetId: senderId, data: { type: 'answer', answer } });
-        }
-
-        // Handle incoming answer
-        if (data.type === 'answer') {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-        }
-
-        // Handle incoming ICE candidate
-        if (data.type === 'candidate') {
-            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-        }
-    });
-
-    let receivedChunks = []; // Array to store incoming file chunks
-
-
-    // Handle data channel events (for both sending and receiving)
-    function handleDataChannelEvents(channel) {
-        
-
-        channel.onopen = () => {
-            console.log("Data channel opened:", channel);
-        };
-
-        channel.onclose = () => {
-            console.log("Data channel closed:", channel);
-        };
-
-        channel.onmessage = (event) => {
-    if (event.data === "DONE") {
-        console.log("File transfer complete!");
-        document.getElementById("notifications").innerHTML = "File transfer complete!";
-        assembleFile();  // Call the file reassembly function after all chunks are received
-    } else {
-        console.log("Chunk received:", event.data);
-        receiveChunk(event.data); // Call the function to store each received chunk
-    }
-};
-        dataChannel = channel
-    }
-
-// Function to store the received chunks
-function receiveChunk(chunk) {
-    receivedChunks.push(chunk); // Add the chunk to the receivedChunks array
-    console.log(`Chunk ${receivedChunks.length} received.`);
-}
-
-// Function to reassemble the chunks into a single file
-function assembleFile() {
-    if (receivedChunks.length === 0) return null;
-
-    // Combine all ArrayBuffers into a single Blob
-    const fileBlob = new Blob(receivedChunks);
-
-    // Create a download link for the file
-    const url = URL.createObjectURL(fileBlob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "received_file"; // You can modify the filename
-    a.innerHTML = `${url}`
-    document.body.appendChild(a);
-    // a.click();
-    // document.body.removeChild(a);
-
-    console.log("File successfully reassembled and ready for download!");
-}
-
-
-    // Function to send a message via the data channel
-    function sendMessage(message) {
-      if (dataChannel && dataChannel.readyState === "open") {
-        dataChannel.send(message);
-        console.log("Message sent via data channel:", message);
-    } else {
-        console.error("Data channel is not open!");
-    }
-    }
-
-    // Function to start the call
-    function startCall() {
-        const targetId = prompt("Enter Peer ID: "); // Ask for the target peer ID dynamically
-        if (targetId && targetId.trim() !== "") {
-            createOffer(targetId); // Call createOffer with the targetId
-        } else {
-            console.error("No valid Peer ID provided!");
-        }
-    }
-
-    function sendTypedMessage() {
-    const messageInput = document.getElementById("messageInput");
-    const message = messageInput.value.trim();
-
-    if (message) {
-        sendMessage(message); // Use the existing sendMessage function
-        console.log("Sent message:", message);
-        messageInput.value = ""; // Clear the input field after sending
-    } else {
-        console.error("Cannot send an empty message!");
-    }
-}
-
-// Function to chunk the file
-function chunkFile(file, chunkSize = 64 * 1024) { // Default chunk size: 64 KB
-    const chunks = [];
-    let start = 0;
-
-    while (start < file.size) {
-        const end = Math.min(start + chunkSize, file.size);
-        const chunk = file.slice(start, end); // Slice the file into chunks
-        chunks.push(chunk);
-        start = end;
-    }
-
-    return chunks; // Return an array of file chunks
-}
-
-
-document.getElementById("fileInput").addEventListener("change", function (event) {
-    const file = event.target.files[0];
-
-    if (!file) return; // Exit early if no file is selected
-
-    console.log(`File sent with name ${file.name}, size = ${file.size} bytes`);
-
-    const chunks = chunkFile(file); // Define chunks outside if block
-    console.log(`File divided into ${chunks.length} chunks`);
-
-    // Send file metadata before transfer
-    const metaData = {
-        filename: file.name,
-        filesize: file.size,
-        totalChunks: chunks.length
-    };
+    <h1>WebRTC Chat</h1>
+    <div id="status">Waiting for connection...</div>
     
-    console.log(metaData);
+    <div id="chatBox">
+        <div id="messages"></div>
+        <input type="text" id="messageInput" placeholder="Type your message...">
+        <button onclick="sendMessage()">Send</button>
+    </div>
 
-    // Send metadata via data channel
-    if (dataChannel && dataChannel.readyState === "open") {
-        dataChannel.send(JSON.stringify({ type: "file-metadata", metaData }));
-        console.log(`Sent file metadata: ${JSON.stringify(metaData)}`);
-    }
-
-    sendChunks(chunks); // Ensure sendChunks(chunks) is called only when chunks is defined
-});
-
-
-//send chunks 
-function sendChunks(chunks) {
-    let chunkIndex = 0;
-    const totalChunks = chunks.length;
-    console.log("sendChunks function starting")
-    
-    // Function to update the progress on the UI
-    function updateProgress() {
-        const progress = Math.floor((chunkIndex / totalChunks) * 100);
-        document.getElementById("notifications").innerHTML = `Sending: ${progress}% (${chunkIndex + 1}/${totalChunks} chunks)`;
-    }
-
-    function sendNextChunk(){
-        if(chunkIndex<chunks.length){
-            if(dataChannel.readyState == "open" && dataChannel.bufferedAmount === 0){
-                const reader = new FileReader()
-                reader.onload = (event)=>{
-                    const arrayBuffer = event.target.result; // Convert Blob to ArrayBuffer
-                    dataChannel.send(arrayBuffer)
-                    console.log(`Sent chunk ${chunkIndex+1}/${chunks.length}`)
-                    chunkIndex++;
-                    updateProgress(); // Update progress after sending a chunk
-    
-                    // Send the next chunk after a small delay (prevents congestion)
-                    setTimeout(sendNextChunk, 10);
-
-                }
-                //Read file chunks as ArrayBuffer using FileReader.readAsArrayBuffer().
-            reader.readAsArrayBuffer(chunks[chunkIndex]);
-
-            }
-            else{
-                //wait for the buffer to clear out
-                setTimeout(sendNextChunk, 50)
-            }
-            
-
-        }
-    else{
-        //all chunks sent, notify the reciever
-        dataChannel.send("DONE")
-        console.log("All chunks sent. Transfer complete.");
-    }
-    }
-    sendNextChunk();
-}
-
-
-
-
-
-
-
-
-
-
-
-    // Example: Send a test message
-    function sendTestMessage() {
-        const message = prompt("Enter a message to send:");
-        if (message) {
-            sendMessage(message);
-        }
-    }
-</script> 
-
-
-
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="index.js"></script>
 </body>
 </html>
 
 
-</body>
-</html>
