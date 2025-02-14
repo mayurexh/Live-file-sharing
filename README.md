@@ -16,10 +16,10 @@ This repository contains the backend code for "Live-file-sharing," an applicatio
 
 ## Features
 
--   **File Uploading:** Allows users to upload files to the server.
--   **Real-time Communication:** Uses Socket.IO for instant updates and notifications.
--   **Express Routing:** Manages API endpoints for file handling and serving static content.
--   **Middleware Integration:** Employs middleware like `multer` for file management and `cors` for handling Cross-Origin Resource Sharing.
+-   **File Uploading:** Allows users to upload files to the and other user who is connected via signaling can download the file.
+-   **File Chunking:** Chunks file and send it to the other user using array buffer and rearrange all the chunks on the other end
+-   **Chating:** Allows users to communicate once they are connected via signaling.
+-   **Real-time Communication:** Uses Socket.IO for instant for signaling between two parties and WebRTC for file sharing.
 
 ## Table of Contents
 
@@ -63,13 +63,6 @@ npm run dev
 
 The server will run on the default port (typically 3000 or 8080).
 
-## Dependencies
-
--   **express**: A fast, unopinionated, minimalist web framework for Node.js.
--   **multer**: Middleware for handling `multipart/form-data`, which is primarily used for uploading files.
--   **socket.io**: Enables real-time, bidirectional communication between web clients and servers.
--   **nodemon**: A tool that automatically restarts the server after detecting file changes in the project, useful during development.
-
 ## Contributing
 
 Contributions are welcome! Here's how you can contribute:
@@ -80,10 +73,3 @@ Contributions are welcome! Here's how you can contribute:
 4.  Push your changes to your fork.
 5.  Submit a pull request to the main repository.
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Contact
-
-Mayuresh Holay - [mayureshholay@gmail.com](mailto:mayureshholay@gmail.com)
