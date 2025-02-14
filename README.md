@@ -12,7 +12,7 @@ This repository contains code for "Live-file-sharing" an application designed fo
 -   **File Uploading:** Allows users to upload files to the and other user who is connected via signaling can download the file.
 -   **File Chunking:** Chunks file and send it to the other user using array buffer and rearrange all the chunks on the other end
 -   **Chating:** Allows users to communicate once they are connected via signaling.
--   **Real-time Communication:** Uses Socket.IO for instant for signaling between two parties and WebRTC for file sharing.
+-   **Real-time Communication:** Uses Socket.IO for signaling between two parties and WebRTC for file sharing.
 
 ## Table of Contents
 
