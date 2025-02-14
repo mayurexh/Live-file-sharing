@@ -4,15 +4,8 @@
 
 </div>
 
-<div align="center">
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js CI](https://github.com/actions/nodejs-ci/workflows/Node.js%20CI/badge.svg)](https://github.com/actions/nodejs-ci/actions)
-[![Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/mayurexh/Live-file-sharing)
-
-</div>
-
-This repository contains the backend code for "Live-file-sharing," an application designed for real-time file sharing and communication. It utilizes Node.js with Express for the server and Socket.IO for enabling live, bidirectional communication between the client and server.
+This repository contains code for "Live-file-sharing" an application designed for real-time file sharing and communication. It utilizes Node.js with Express for the server and Socket.IO and WebRTC for peer to peer live file sharing..
 
 ## Features
 
@@ -25,10 +18,8 @@ This repository contains the backend code for "Live-file-sharing," an applicatio
 
 -   [Installation](#installation)
 -   [Running the Project](#running-the-project)
--   [Dependencies](#dependencies)
 -   [Contributing](#contributing)
--   [License](#license)
--   [Contact](#contact)
+
 
 ## Installation
 
